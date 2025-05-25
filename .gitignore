@@ -1,0 +1,28 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*.so
+
+# Environment folders
+.venv/
+env/
+venv/
+
+# MacOS system files
+.DS_Store
+
+# Model checkpoints
+*.pth
+models/
+
+# Data (large files not tracked)
+data/
+*.png
+*.jpg
+*.jpeg
+
+# Notebooks (optional)
+*.ipynb_checkpoints
+
+# VS Code
+.vscode/
