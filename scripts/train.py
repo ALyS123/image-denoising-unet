@@ -1,13 +1,16 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
-import matplotlib.pyplot as plt
-import os
+from glob import glob
+from pytorch_msssim import ssim
 
 # -----------------------------
-# U-Net Model (same as training)
+# U-Net Model for Denoising
 # -----------------------------
 class UNet(nn.Module):
     def __init__(self):
@@ -46,55 +49,93 @@ class UNet(nn.Module):
         return out
 
 # -----------------------------
-# Load and Denoise Image
+# Dataset with Curriculum Noise
 # -----------------------------
-def run_denoising(model_path, image_path):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+class DenoisingDataset(Dataset):
+    def __init__(self, hr_dir, transform, epoch=0, total_epochs=50):
+        self.hr_images = sorted(glob(os.path.join(hr_dir, '*.png')))
+        self.transform = transform
+        self.epoch = epoch
+        self.total_epochs = total_epochs
 
-    # Load model
-    model = UNet().to(device)
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.eval()
+    def __len__(self):
+        return len(self.hr_images)
 
-    # Preprocess image
+    def add_gaussian_noise(self, image, std):
+        noise = torch.randn_like(image) * std
+        noisy = image + noise
+        return torch.clamp(noisy, 0., 1.)
+
+    def __getitem__(self, idx):
+        hr_img = Image.open(self.hr_images[idx]).convert('RGB')
+        clean_img = self.transform(hr_img)
+
+        # Progressive noise: high → low
+        max_std = 0.3
+        min_std = 0.05
+        std = max_std - ((max_std - min_std) * (self.epoch / self.total_epochs))
+        noisy_img = self.add_gaussian_noise(clean_img, std)
+
+        return noisy_img, clean_img
+
+# -----------------------------
+# Hybrid Loss: MSE + SSIM
+# -----------------------------
+def hybrid_loss(output, target):
+    mse_loss = F.mse_loss(output, target)
+    ssim_loss = 1 - ssim(output, target, data_range=1.0, size_average=True)
+    return 0.5 * mse_loss + 0.5 * ssim_loss
+
+# -----------------------------
+# Training Loop
+# -----------------------------
+def train_unet_denoiser():
+    hr_dir = 'data/DIV2K/DIV2K_train_HR/DIV2K_train_HR' # HR images for training 
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor()
     ])
-    image = Image.open(image_path).convert('RGB')
-    input_tensor = transform(image).unsqueeze(0).to(device)
 
-    # Inference
-    with torch.no_grad():
-        output = model(input_tensor)
+    batch_size = 4
+    num_epochs = 50
+    learning_rate = 0.001
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Post-process output
-    output_image = output.squeeze().permute(1, 2, 0).cpu().numpy()
-    output_image = (output_image * 255).astype('uint8')
-    result = Image.fromarray(output_image)
+    model = UNet().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Save and show
-    result.save('denoised_result.png')
-    print("✅ Denoised image saved as 'denoised_result.png'")
+    for epoch in range(num_epochs):
+        dataset = DenoisingDataset(hr_dir, transform, epoch=epoch, total_epochs=num_epochs)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    # Display
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    axs[0].imshow(image)
-    axs[0].set_title('Noisy Input')
-    axs[0].axis('off')
+        print(f"\n✅ Epoch {epoch+1}/{num_epochs} — Training on {len(dataset)} images")
 
-    axs[1].imshow(result)
-    axs[1].set_title('Denoised Output')
-    axs[1].axis('off')
+        model.train()
+        running_loss = 0.0
 
-    plt.tight_layout()
-    plt.show()
+        for i, (noisy, clean) in enumerate(dataloader):
+            noisy = noisy.to(device)
+            clean = clean.to(device)
+
+            outputs = model(noisy)
+            loss = hybrid_loss(outputs, clean)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            if (i + 1) % 10 == 0:
+                print(f"  Step [{i+1}/{len(dataloader)}], Loss: {loss.item():.4f}")
+
+        print(f"✅ Epoch [{epoch+1}/{num_epochs}] complete — Avg Loss: {running_loss/len(dataloader):.4f}")
+
+    torch.save(model.state_dict(), 'models/unet_denoiser.pth')
+    print("\n🎉 Training complete. Model saved as 'unet_denoiser.pth'")
 
 # -----------------------------
-# Run
+# Run Training
 # -----------------------------
 if __name__ == "__main__":
-    model_path = 'unet_denoiser.pth'
-    image_path = 'LR_image.png'  # Low resolution image path
-
-    run_denoising(model_path, image_path)
+    train_unet_denoiser()
