@@ -78,7 +78,6 @@ This will process a noisy image and save `denoised_result.png`.
 |-------------|-----------------|
 | ![Noisy](examples/noisy.png) | ![Denoised](examples/denoised.png) |
 
-> You can add your own example outputs in the `examples/` folder and update this table.
 
 ---
 
