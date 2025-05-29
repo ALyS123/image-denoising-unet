@@ -16,10 +16,10 @@ venv/
 models/
 
 # Data (large files not tracked)
-#data/
-#*.png
-#*.jpg
-#*.jpeg
+data/
+*.png
+*.jpg
+*.jpeg
 
 # Notebooks (optional)
 *.ipynb_checkpoints
