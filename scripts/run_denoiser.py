@@ -95,7 +95,7 @@ def run_denoising(model_path, image_path):
 # -----------------------------
 if __name__ == "__main__":
     model_path = 'models/unet_denoiser.pth'
-    image_path = 'data/DIV2K/DIV2K_train_LR/0800.png' # Low resolution image input..
+    image_path = 'data/0890.png' # Low resolution image input..
 
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"❌ Model file not found: {model_path}")
