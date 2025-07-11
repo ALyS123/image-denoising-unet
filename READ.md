@@ -2,7 +2,7 @@
 
 This project implements an image denoising pipeline using a U-Net convolutional neural network. The model takes noisy RGB images and restores their clarity by learning a mapping from noisy inputs to clean outputs. Built with PyTorch and trained on custom noisy datasets.
 
-![Example Denoising Result](assets/denoised_example.png) <!-- Replace with actual image path -->
+![Example Denoising Result](examples/denoised.png)
 
 ---
 
@@ -78,8 +78,7 @@ image-denoising-unet/
 
 | Noisy Input | Denoised Output |
 |-------------|-----------------|
-| ![Input](assets/noisy.png) | ![Output](assets/denoised.png) |  
-<!-- Replace with actual image paths -->
+| ![Input](examples/noisy.png) | ![Output](examples/denoised.png) |  
 
 ---
 
